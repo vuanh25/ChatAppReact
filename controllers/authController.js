@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 const otpGenerator = require("otp-generator");
-const mailService = require("../services/mailer");
+const mailService = require("../services/sendMail");
 const crypto = require("crypto");
 const filterObj = require("../utils/filterObj");
 
