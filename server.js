@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const dotenv = require("dotenv");
+const shortid = require("shortid");
 dotenv.config({ path: "./config.env" });
 
 process.on("uncaughtException", (err) => {
@@ -9,6 +10,7 @@ process.on("uncaughtException", (err) => {
 });
 
 const app = require("./app");
+const socketioJwt = require("socketio-jwt");
 
 const http = require("http");
 const server = http.createServer(app);
@@ -16,6 +18,8 @@ const server = http.createServer(app);
 const { Server } = require("socket.io"); // Add this
 const User = require("./models/user");
 const Group = require("./models/groupChat");
+const requestGroup = require("./models/requestGroup");
+const { group } = require("console");
 
 const io = new Server(server, {
   cors: {
@@ -37,9 +41,19 @@ server.listen(port, () => {
   console.log(`App running on port ${port} ...`);
 });
 
+io.use(
+  socketioJwt.authorize({
+    secret: process.env.JWT_SECRET,
+    handshake: true,
+    callback: false,
+  })
+);
+
 io.on("connection", async (socket) => {
   console.log(JSON.stringify(socket.handshake.query));
-  const user_id = socket.handshake.query["user_id"];
+
+  const user_id = socket.decoded_token.userId;
+  console.log(user_id);
 
   console.log(`User connected ${socket.id}`);
 
@@ -61,11 +75,15 @@ io.on("connection", async (socket) => {
     }
   }
 
-  socket.on("create_group", async ({ groupName, members }) => {
+  socket.on("create_group", async ({ groupName, members, public }) => {
     try {
+      const shortGroupId = shortid.generate();
       const newGroup = await Group.create({
         name: groupName,
+        host: user_id,
+        groupId: shortGroupId,
         members: members,
+        public: public,
         messages: [],
       });
       socket.join(newGroup._id);
@@ -74,6 +92,93 @@ io.on("connection", async (socket) => {
       console.error(error);
     }
   });
+
+  socket.on("find_group", async ({ groupId }) => {
+    try {
+      const groupChat = await Group.findOne({ groupId: groupId });
+      const host = groupChat.host;
+      const from_user = await User.findById(host);
+      const currentuser = await User.findById(user_id);
+      if (
+        groupChat.public == false &&
+        groupChat.members.includes(user_id) == false
+      ) {
+        const request = await Group.findByIdAndUpdate(
+          groupChat._id,
+          { $push: { request: user_id } },
+          { new: true }
+        );
+        io.to(from_user?.socket_id).emit("request_group", request);
+      } else if (
+        groupChat.public == false &&
+        groupChat.members.includes(user_id) == true
+      ) {
+        socket.join(groupChat._id);
+        io.to(from_user.socket_id).emit(
+          "group_found",
+          "User:  " + user_id + "vào phòng"
+        );
+      } else if (
+        groupChat.public == true &&
+        groupChat.members.includes(user_id) == false
+      ) {
+        const new_member = Group.findByIdAndUpdate(
+          { groupId: groupId },
+          { $push: { members: user_id } },
+          { new: true }
+        );
+        io.to(groupChat._id).emit("new_member", new_member);
+      } else if (
+        groupChat.public == true &&
+        groupChat.members.includes(user_id) == true
+      ) {
+        socket.join(groupChat._id);
+        io.to(groupChat._id).emit("group_found", groupChat);
+      }
+
+      io.to(currentuser.socket_id).emit(
+        "group_notfound",
+        "Không tìm thấy nhóm"
+      );
+    } catch (error) {
+      console.log(error);
+    }
+  });
+
+  socket.on("accept_request", async ({ group_id, member_id }) => {
+    try {
+      const groupChat = await Group.findOneAndUpdate(
+        {
+          groupId: group_id,
+        },
+        {
+          $push: {
+            members: member_id,
+          },
+          $pull: {
+            request: member_id,
+          },
+        },
+        {
+          new: true,
+          runValidators: true,
+        }
+      ).populate("members", "username email");
+
+      groupChat.members.forEach(async (member) => {
+        const user = await User.findById(member._id).lean().select("socket_id");
+        if (user && user.socket_id) {
+          io.to(user.socket_id).emit("accepted_request", {
+            group_id,
+            member_id,
+          });
+        }
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  });
+
   socket.on("text_message", async (data) => {
     console.log("Received message:", data);
 

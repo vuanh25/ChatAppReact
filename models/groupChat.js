@@ -5,7 +5,24 @@ const groupChatSchema = new mongoose.Schema({
     type: String,
     required: [true, "Tên nhóm không được để trống"],
   },
+  groupId: {
+    type: String,
+  },
+  host: {
+    type: mongoose.Schema.ObjectId,
+    ref: "User",
+  },
+  public: {
+    type: Boolean,
+    default: true,
+  },
   members: [
+    {
+      type: mongoose.Schema.ObjectId,
+      ref: "User",
+    },
+  ],
+  request: [
     {
       type: mongoose.Schema.ObjectId,
       ref: "User",

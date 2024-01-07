@@ -19,6 +19,13 @@ router.patch(
   userController.updateMe
 );
 
+router.patch(
+  "/update-avatar/:userId",
+  authController.protect,
+  upload.single("avatar"),
+  userController.updateAvatar
+);
+
 router.get("/get-users", authController.protect, userController.getUsers);
 
 module.exports = router;

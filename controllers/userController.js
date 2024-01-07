@@ -24,6 +24,24 @@ exports.updateMe = catchAsync(async (req, res, next) => {
   });
 });
 
+exports.updateAvatar = catchAsync(async (req, res, next) => {
+  const filteredBody = filterObj(req.file.buffer, "avatar");
+
+  const userDoc = await User.findByIdAndUpdate(
+    req.params.userId,
+    filteredBody,
+    {
+      new: true,
+      runValidators: true,
+    }
+  );
+  res.status(200).json({
+    status: "success",
+    data: userDoc,
+    message: "Cập nhật ảnh đại diện thành công",
+  });
+});
+
 exports.getUsers = catchAsync(async (req, res, next) => {
   const all_users = await User.find({
     verified: true,
