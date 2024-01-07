@@ -1,8 +1,22 @@
 const User = require("../models/user");
 const catchAsync = require("../utils/catchAsync");
 const filterObj = require("../utils/filterObj");
+const multer = require("multer");
 
 const { generateToken04 } = require("./zegoServerAssistant");
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "uploads/"); // Thư mục lưu trữ tệp
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + "-" + file.originalname); // Tên tệp sau khi lưu trữ
+  },
+});
+
+const upload = multer({ storage: storage });
+
+exports.uploadAvatar = upload.single("avatar");
 
 exports.getMe = catchAsync(async (req, res, next) => {
   res.status(200).json({
@@ -25,11 +39,11 @@ exports.updateMe = catchAsync(async (req, res, next) => {
 });
 
 exports.updateAvatar = catchAsync(async (req, res, next) => {
-  const filteredBody = filterObj(req.file.buffer, "avatar");
-
+  const avatarPath = req.file.path;
+  const userId = req.params.userId;
   const userDoc = await User.findByIdAndUpdate(
-    req.params.userId,
-    filteredBody,
+    userId,
+    { $set: { avatar: avatarPath } },
     {
       new: true,
       runValidators: true,

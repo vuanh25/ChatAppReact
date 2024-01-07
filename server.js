@@ -18,8 +18,6 @@ const server = http.createServer(app);
 const { Server } = require("socket.io"); // Add this
 const User = require("./models/user");
 const Group = require("./models/groupChat");
-const requestGroup = require("./models/requestGroup");
-const { group } = require("console");
 
 const io = new Server(server, {
   cors: {
@@ -53,6 +51,12 @@ io.on("connection", async (socket) => {
   console.log(JSON.stringify(socket.handshake.query));
 
   const user_id = socket.decoded_token.userId;
+  if (!user_id) {
+    socket.emit("not_authenticated", { message: "Bạn chưa đăng nhập." });
+
+    socket.disconnect();
+    return;
+  }
   console.log(user_id);
 
   console.log(`User connected ${socket.id}`);
@@ -103,12 +107,19 @@ io.on("connection", async (socket) => {
         groupChat.public == false &&
         groupChat.members.includes(user_id) == false
       ) {
-        const request = await Group.findByIdAndUpdate(
-          groupChat._id,
-          { $push: { request: user_id } },
-          { new: true }
-        );
-        io.to(from_user?.socket_id).emit("request_group", request);
+        if (groupChat.request.includes(user_id) == true) {
+          io.to(currentuser.socket_id).emit(
+            "group_found",
+            "Bạn đã gửi yêu cầu tham gia nhóm"
+          );
+        } else {
+          const request = await Group.findByIdAndUpdate(
+            groupChat._id,
+            { $push: { request: user_id } },
+            { new: true }
+          );
+          io.to(from_user?.socket_id).emit("request_group", request);
+        }
       } else if (
         groupChat.public == false &&
         groupChat.members.includes(user_id) == true
@@ -219,15 +230,6 @@ io.on("connection", async (socket) => {
     });
   });
 
-  socket.on("file_message", (data) => {
-    console.log("Received message:", data);
-    const fileExtension = path.extname(data.file.name);
-
-    const filename = `${Date.now()}_${Math.floor(
-      Math.random() * 10000
-    )}${fileExtension}`;
-  });
-
   socket.on("update_message", async ({ group_id, message_id, message }) => {
     try {
       const groupChat = await Group.findOneAndUpdate(
@@ -296,30 +298,41 @@ io.on("connection", async (socket) => {
 
   socket.on("kick_member", async ({ group_id, member_id }) => {
     try {
-      const groupChat = await Group.findOneAndUpdate(
-        {
-          _id: group_id,
-        },
-        {
-          $pull: {
-            members: member_id,
+      const group = await Group.findOne({ groupId: group_id });
+      if (user_id != group.host) {
+        io.to(user_id).emit("not_host", {
+          group_id,
+          message: "Bạn không phải chủ phòng",
+        });
+        return;
+      } else {
+        const groupChat = await Group.findOneAndUpdate(
+          {
+            _id: group_id,
           },
-        },
-        {
-          new: true,
-          runValidators: true,
-        }
-      ).populate("members", "username email");
+          {
+            $pull: {
+              members: member_id,
+            },
+          },
+          {
+            new: true,
+            runValidators: true,
+          }
+        ).populate("members", "username email");
 
-      groupChat.members.forEach(async (member) => {
-        const user = await User.findById(member._id).lean().select("socket_id");
-        if (user && user.socket_id) {
-          io.to(user.socket_id).emit("kicked_member", {
-            group_id,
-            member_id,
-          });
-        }
-      });
+        groupChat.members.forEach(async (member) => {
+          const user = await User.findById(member._id)
+            .lean()
+            .select("socket_id");
+          if (user && user.socket_id) {
+            io.to(user.socket_id).emit("kicked_member", {
+              group_id,
+              member_id,
+            });
+          }
+        });
+      }
     } catch (error) {
       console.error(error);
     }
