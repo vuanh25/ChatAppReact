@@ -25,14 +25,12 @@ router.get("/get-me", authController.protect, userController.getMe);
 router.patch("/update-me", authController.protect, userController.updateMe);
 
 router.post(
-  "/update-avatar/:userId",
+  "/update-avatar",
   authController.protect,
   userController.uploadAvatar,
   userController.updateAvatar
 );
 
 router.get("/get-users", authController.protect, userController.getUsers);
-
-
 
 module.exports = router;

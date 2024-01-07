@@ -40,7 +40,8 @@ exports.updateMe = catchAsync(async (req, res, next) => {
 
 exports.updateAvatar = catchAsync(async (req, res, next) => {
   const avatarPath = req.file.path;
-  const userId = req.params.userId;
+  const userId = req.user._id;
+  console.log(userId);
   const userDoc = await User.findByIdAndUpdate(
     userId,
     { $set: { avatar: avatarPath } },
