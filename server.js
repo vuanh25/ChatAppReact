@@ -175,7 +175,7 @@ io.on("connection", async (socket) => {
           runValidators: true,
         }
       ).populate("members", "username email");
-
+        
       groupChat.members.forEach(async (member) => {
         const user = await User.findById(member._id).lean().select("socket_id");
         if (user && user.socket_id) {

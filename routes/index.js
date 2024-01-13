@@ -6,6 +6,7 @@ const userRoute = require("./user");
 
 router.use("/auth", authRoute);
 router.use("/user", userRoute);
+router.use("/chat", userRoute);
 
 
 module.exports = router;

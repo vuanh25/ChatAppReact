@@ -17,6 +17,7 @@ const session = require("cookie-session"); // Simple cookie-based session middle
 
 const app = express();
 
+app.use('/uploads', express.static('uploads'));
 app.use(
   cors({
     origin: "*",

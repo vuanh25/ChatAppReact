@@ -22,7 +22,7 @@ router.post(
 );
 
 router.get("/get-me", authController.protect, userController.getMe);
-router.patch("/update-me", authController.protect, userController.updateMe);
+router.patch("/update-me", authController.protect, userController.updateMe); 
 
 router.post(
   "/update-avatar",
