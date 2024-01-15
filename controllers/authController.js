@@ -169,7 +169,7 @@ exports.logout = catchAsync(async (req, res, next) => {
 });
 
 exports.protect = catchAsync(async (req, res, next) => {
-  let token;
+  let token; 
   if (
     req.headers.authorization &&
     req.headers.authorization.startsWith("Bearer")
