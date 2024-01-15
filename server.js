@@ -81,12 +81,13 @@ io.on("connection", async (socket) => {
 
   socket.on("create_group", async ({ groupName, members, public }) => {
     try {
+      const hostUser = await User.findById(user_id);
       const shortGroupId = shortid.generate();
       const newGroup = await Group.create({
         name: groupName,
         host: user_id,
         groupId: shortGroupId,
-        members: members,
+        members: [hostUser],
         public: public,
         messages: [],
       });
@@ -190,31 +191,35 @@ io.on("connection", async (socket) => {
     }
   });
 
-  socket.on("text_message", async (data) => {
-    console.log("Received message:", data);
-
-    const { message, group_id, from, type } = data;
-
+  socket.on("text_message", async (data) => { 
+    const { message, groupId, from, type } = data;
     const from_user = await User.findById(from);
-
+    const user = { 
+      fullname: from_user.fullname, 
+      about: from_user.about, 
+      avatar: from_user.avatar, 
+      email: from_user.email
+    };    
+    console.log("User: " + from_user);
     const new_message = {
       sender: from,
       type: type,
       created_at: Date.now(),
       text: message,
+      user: user 
     };
-    const chat = await Group.findById(group_id);
+    const chat = await Group.findOne({groupId: groupId});
     chat.messages.push(new_message);
 
     await chat.save({ new: true, validateModifiedOnly: true });
-
+ 
     chat.members.forEach(async (member) => {
       const user = await User.findById(member._id).lean().select("socket_id");
       if (user && user.socket_id) {
         console.log(user.socket_id);
 
         io.to(user.socket_id).emit("new_message", {
-          group_id,
+          group_id: groupId,
           message: new_message,
         });
       } else {
@@ -222,11 +227,6 @@ io.on("connection", async (socket) => {
           `Invalid user_id or missing socket_id for member: ${member._id}`
         );
       }
-    });
-
-    io.to(from_user?.socket_id).emit("new_message", {
-      group_id,
-      message: new_message,
     });
   });
 

@@ -21,19 +21,31 @@ exports.getGroupInfo = catchAsync(async (req, res, next) => {
 
 exports.findById = catchAsync(async (req, res, next) => {
   const { groupId } = req.params;
-  console.log(req.params);
-  console.log({ groupId });
   const group = await GroupChat.findOne({ groupId });
-  console.log(group);
   if (!group) {
     return res.status(404).json({
       status: "fail",
       message: "Không tìm thấy phòng",
     });
   }
-
-  res.status(200).json({
-    status: "success",
-    data: group,
-  });
+  
+  // Update
+  if (group.public) {
+    const _id = group._id;
+    const userId = req.user.id;
+    const updatedGroup = await GroupChat.findByIdAndUpdate(
+      { _id },
+      { $addToSet: { members: userId } }, 
+      { new: true }
+    );
+    res.status(200).json({
+      status: "success",
+      data: updatedGroup,
+    });
+  } else {
+    res.status(200).json({
+      status: "success",
+      data: group,
+    });
+  }
 });
