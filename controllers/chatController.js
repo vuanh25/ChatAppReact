@@ -49,3 +49,23 @@ exports.findById = catchAsync(async (req, res, next) => {
     });
   }
 });
+
+exports.getGroupUsers = catchAsync(async (req, res, next) => {
+  const { groupId } = req.params; 
+  const groupInfo = await GroupChat.findOne({ groupId })
+        .populate('host')
+        .populate('members', '_id fullname avatar email');
+
+  if (!groupInfo) {
+    return res.status(404).json({
+      status: "failed",
+      message: "Không tìm thấy nhóm.",
+    });
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: groupInfo.members,
+    host: groupInfo.host 
+  });
+});

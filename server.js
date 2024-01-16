@@ -32,7 +32,7 @@ const DB = process.env.DATABASE.replace(
 );
 
 mongoose.connect(DB, {}).then((con) => {
-  console.log("DB Connection successful");
+  console.log("Database connection successful");
 });
 const port = process.env.PORT || 8000;
 server.listen(port, () => {
@@ -48,8 +48,6 @@ io.use(
 );
 
 io.on("connection", async (socket) => {
-  console.log(JSON.stringify(socket.handshake.query));
-
   const user_id = socket.decoded_token.userId;
   if (!user_id) {
     socket.emit("not_authenticated", { message: "Bạn chưa đăng nhập." });
@@ -57,9 +55,8 @@ io.on("connection", async (socket) => {
     socket.disconnect();
     return;
   }
-  console.log(user_id);
 
-  console.log(`User connected ${socket.id}`);
+  console.log(`User connected: ${socket.id}`);
 
   if (user_id != null && Boolean(user_id)) {
     try {
@@ -200,13 +197,13 @@ io.on("connection", async (socket) => {
       avatar: from_user.avatar, 
       email: from_user.email
     };    
-    console.log("User: " + from_user);
     const new_message = {
       sender: from,
       type: type,
       created_at: Date.now(),
       text: message,
-      user: user 
+      fullname: user.fullname,
+      avatar: user.avatar
     };
     const chat = await Group.findOne({groupId: groupId});
     chat.messages.push(new_message);
@@ -216,7 +213,6 @@ io.on("connection", async (socket) => {
     chat.members.forEach(async (member) => {
       const user = await User.findById(member._id).lean().select("socket_id");
       if (user && user.socket_id) {
-        console.log(user.socket_id);
 
         io.to(user.socket_id).emit("new_message", {
           group_id: groupId,
@@ -265,7 +261,7 @@ io.on("connection", async (socket) => {
   socket.on("delete_message", async ({ group_id, message_id }) => {
     try {
       const groupChat = await Group.findOneAndUpdate(
-        {
+        { 
           _id: group_id,
         },
         {
@@ -284,7 +280,7 @@ io.on("connection", async (socket) => {
       groupChat.members.forEach(async (member) => {
         const user = await User.findById(member._id).lean().select("socket_id");
         if (user && user.socket_id) {
-          console.log(user.socket_id);
+          console.log("12345");
           io.to(user.socket_id).emit("deleted_message", {
             group_id,
             message_id,
@@ -333,6 +329,40 @@ io.on("connection", async (socket) => {
           }
         });
       }
+    } catch (error) {
+      console.error(error);
+    }
+  });
+
+  socket.on("leave_group", async ({ group_id, member_id }) => {
+    try {
+      const group = await Group.findOne({ groupId: group_id });
+        const groupChat = await Group.findOneAndUpdate(
+          {
+            _id: group_id,
+          },
+          {
+            $pull: {
+              members: member_id,
+            },
+          },
+          {
+            new: true,
+            runValidators: true,
+          }
+        ).populate("members", "username email");
+
+        groupChat.members.forEach(async (member) => {
+          const user = await User.findById(member._id)
+            .lean()
+            .select("socket_id");
+          if (user && user.socket_id) {
+            io.to(user.socket_id).emit("kicked_member", {
+              group_id,
+              member_id,
+            });
+          }
+        });
     } catch (error) {
       console.error(error);
     }

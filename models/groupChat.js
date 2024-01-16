@@ -1,6 +1,10 @@
 const mongoose = require("mongoose");
 
 const groupChatSchema = new mongoose.Schema({
+  id: {
+    type: mongoose.Schema.ObjectId,
+    ref: "groupchats"
+  },
   name: {
     type: String,
     required: [true, "Tên nhóm không được để trống"],
@@ -30,6 +34,10 @@ const groupChatSchema = new mongoose.Schema({
   ],
   messages: [
     {
+      _id: {
+        type: mongoose.Schema.ObjectId,
+        ref: "messages"
+      },
       sender: {
         type: mongoose.Schema.ObjectId,
         ref: "User",
@@ -48,6 +56,12 @@ const groupChatSchema = new mongoose.Schema({
       file: {
         type: String,
       },
+      fullname: {
+        type: String,
+      },
+      avatar: {
+        type: String,
+      }
     },
   ],
 });
