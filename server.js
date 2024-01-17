@@ -95,20 +95,21 @@ io.on("connection", async (socket) => {
     }
   });
 
-  socket.on("find_group", async ({ groupId }) => {
+  socket.on("find_group", async ({ groupId, user_id }) => {
     try {
       const groupChat = await Group.findOne({ groupId: groupId });
       const host = groupChat.host;
       const from_user = await User.findById(host);
       const currentuser = await User.findById(user_id);
-      if (
-        groupChat.public == false &&
-        groupChat.members.includes(user_id) == false
-      ) {
-        if (groupChat.request.includes(user_id) == true) {
+      console.log(user_id);
+      console.log(groupChat.members);
+      console.log(groupChat.members.includes(user_id));
+  
+      if (groupChat.public === false && !groupChat.members.includes(user_id)) {
+        if (groupChat.request.includes(user_id)) {
           io.to(currentuser.socket_id).emit(
             "group_found",
-            "Bạn đã gửi yêu cầu tham gia nhóm"
+            "Yêu cầu tham gia nhóm"
           );
         } else {
           const request = await Group.findByIdAndUpdate(
@@ -118,36 +119,28 @@ io.on("connection", async (socket) => {
           );
           io.to(from_user?.socket_id).emit("request_group", request);
         }
-      } else if (
-        groupChat.public == false &&
-        groupChat.members.includes(user_id) == true
-      ) {
+      } else if (groupChat.public === false && groupChat.request.includes(user_id)) {
         socket.join(groupChat._id);
-        io.to(from_user.socket_id).emit( "group_found",
-          "User:  " + user_id + "vào phòng"
+        io.to(from_user.socket_id).emit(
+          "group_found",
+          `User: ${user_id} vào phòng`
         );
-      } else if (
-        groupChat.public == true &&
-        groupChat.members.includes(user_id) == false
-      ) {
-        const new_member = Group.findByIdAndUpdate(
+      } else if (groupChat.public === true && !groupChat.members.includes(user_id)) {
+        const new_member = await Group.findOneAndUpdate(
           { groupId: groupId },
           { $push: { members: user_id } },
           { new: true }
         );
         io.to(groupChat._id).emit("new_member", new_member);
-      } else if (
-        groupChat.public == true &&
-        groupChat.members.includes(user_id) == true
-      ) {
+      } else if (groupChat.public === true && groupChat.members.includes(user_id)) {
         socket.join(groupChat._id);
         io.to(groupChat._id).emit("group_found", groupChat);
+      } else {
+        io.to(currentuser.socket_id).emit(
+          "group_notfound",
+          "Không tìm thấy nhóm"
+        );
       }
-
-      io.to(currentuser.socket_id).emit(
-        "group_notfound",
-        "Không tìm thấy nhóm"
-      );
     } catch (error) {
       console.log(error);
     }
