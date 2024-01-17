@@ -61,7 +61,10 @@ const groupChatSchema = new mongoose.Schema({
       },
       avatar: {
         type: String,
-      }
+      },
+      pubDate: {
+        type: String, 
+      },
     },
   ],
 });

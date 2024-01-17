@@ -76,7 +76,7 @@ io.on("connection", async (socket) => {
     }
   }
 
-  socket.on("create_group", async ({ groupName, members, public }) => {
+  socket.on("create_group", async ({ groupName, publicGroup }) => {
     try {
       const hostUser = await User.findById(user_id);
       const shortGroupId = shortid.generate();
@@ -85,7 +85,7 @@ io.on("connection", async (socket) => {
         host: user_id,
         groupId: shortGroupId,
         members: [hostUser],
-        public: public,
+        public: publicGroup,
         messages: [],
       });
       socket.join(newGroup._id);
@@ -123,8 +123,7 @@ io.on("connection", async (socket) => {
         groupChat.members.includes(user_id) == true
       ) {
         socket.join(groupChat._id);
-        io.to(from_user.socket_id).emit(
-          "group_found",
+        io.to(from_user.socket_id).emit( "group_found",
           "User:  " + user_id + "vào phòng"
         );
       } else if (
@@ -197,11 +196,16 @@ io.on("connection", async (socket) => {
       avatar: from_user.avatar, 
       email: from_user.email
     };    
+
+    const currentTime = new Date();
+    const pubDate = `${currentTime.getHours()}:${currentTime.getMinutes()} ${currentTime.getDate()}/${currentTime.getMonth() + 1}/${currentTime.getFullYear()}`;
+
     const new_message = {
       sender: from,
       type: type,
       created_at: Date.now(),
       text: message,
+      pubDate: pubDate,
       fullname: user.fullname,
       avatar: user.avatar
     };
@@ -336,33 +340,30 @@ io.on("connection", async (socket) => {
 
   socket.on("leave_group", async ({ group_id, member_id }) => {
     try {
-      const group = await Group.findOne({ groupId: group_id });
-        const groupChat = await Group.findOneAndUpdate(
-          {
-            _id: group_id,
+      const groupChat = await Group.findOneAndUpdate(
+        { _id: group_id },
+        {
+          $pull: {
+            members: member_id,
           },
-          {
-            $pull: {
-              members: member_id,
-            },
-          },
-          {
-            new: true,
-            runValidators: true,
-          }
-        ).populate("members", "username email");
+        },
+        {
+          new: true,
+          runValidators: true,
+        }
+      ).populate("members", "username email");
 
-        groupChat.members.forEach(async (member) => {
-          const user = await User.findById(member._id)
-            .lean()
-            .select("socket_id");
-          if (user && user.socket_id) {
-            io.to(user.socket_id).emit("kicked_member", {
-              group_id,
-              member_id,
-            });
-          }
-        });
+      groupChat.members.forEach(async (member) => {
+        const user = await User.findById(member._id)
+          .lean()
+          .select("socket_id");
+        if (user && user.socket_id) {
+          io.to(user.socket_id).emit("kicked_member", {
+            group_id,
+            member_id,
+          });
+        }
+      });
     } catch (error) {
       console.error(error);
     }

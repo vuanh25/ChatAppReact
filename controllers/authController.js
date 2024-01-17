@@ -11,7 +11,7 @@ const { promisify } = require("util");
 const catchAsync = require("../utils/catchAsync");
 const { log } = require("console");
 
-const signToken = (userId) => jwt.sign({ userId }, process.env.JWT_SECRET);
+const signToken = (userId, avatar) => jwt.sign({ userId, avatar }, process.env.JWT_SECRET);
 
 exports.register = catchAsync(async (req, res, next) => {
   const { firstName, lastName, email, password } = req.body;
@@ -108,7 +108,7 @@ exports.verifyOTP = catchAsync(async (req, res, next) => {
   user.otp = undefined;
   await user.save({ new: true, validateModifiedOnly: true });
 
-  const token = signToken(user._id);
+  const token = signToken(user._id, user.avatar);
 
   res.status(200).json({
     status: "success",
@@ -129,9 +129,8 @@ exports.login = catchAsync(async (req, res, next) => {
     return;
   }
 
-  const user = await User.findOne({ email: email }).select("+password");
+  const user = await User.findOne({ email: email }).select("password avatar");
 
-  console.log(user);
   if (!user || !user.password) {
     res.status(400).json({
       status: "error",
@@ -147,7 +146,10 @@ exports.login = catchAsync(async (req, res, next) => {
     return;
   }
 
-  const token = signToken(user._id);
+  // if (!user.avatar) {
+  //   user.avatar = '';
+  // }
+  const token = signToken(user._id, user.avatar);
   res.status(200).json({
     status: "success",
     message: "Đăng nhập thành công",
